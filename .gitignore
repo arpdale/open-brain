@@ -1,8 +1,50 @@
+# OS
 .DS_Store
+Thumbs.db
+
+# Environment & credentials
 .env
 .env.local
 .env.*.local
+credentials.json
+token.json
+gmail-sync-log.json
+sync-log.json
+
+# Dependencies
 node_modules/
+
+# Python caches
+__pycache__/
+*.pyc
+
+# Editor
 .vscode/
+.idea/
+*.swp
+
+# Supabase CLI local state (NOT the supabase/ folder itself)
 supabase/.branches/
 supabase/.temp/
+
+# Build artifacts
+deno.lock
+.next/
+dist/
+build/
+out/
+
+# Vercel
+.vercel
+
+# OB1 maintainer-local overlays (safe to keep ignored)
+.planning/
+.local/
+.agent/
+.claude.json
+
+# Logs
+*.log
+npm-debug.log*
+yarn-debug.log*
+pnpm-debug.log*
