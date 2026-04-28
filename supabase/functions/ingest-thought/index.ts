@@ -30,9 +30,21 @@ const REPLAY_WINDOW_SEC = 60 * 5;
 
 const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY);
 
-// EdgeRuntime is provided by the Supabase Edge runtime.
-// deno-lint-ignore no-explicit-any
-declare const EdgeRuntime: { waitUntil: (p: Promise<unknown>) => void };
+// EdgeRuntime is provided by the Supabase Edge runtime; declare for typing.
+declare const EdgeRuntime: { waitUntil: (p: Promise<unknown>) => void } | undefined;
+
+// Defensive runtime-availability check. If EdgeRuntime.waitUntil isn't
+// available (runtime change, fallback environment), fall back to bare
+// fire-and-forget with error logging. The runtime may kill the work mid-flight
+// in that case, but the request still returns 200 quickly.
+function runWhenIdle(p: Promise<unknown>): void {
+  const rt = (globalThis as { EdgeRuntime?: typeof EdgeRuntime }).EdgeRuntime;
+  if (rt?.waitUntil) {
+    rt.waitUntil(p);
+  } else {
+    p.catch((err) => console.error("background work failed (no waitUntil):", err));
+  }
+}
 
 // ----------------------------------------------------------------------------
 // Slack signature verification
@@ -197,36 +209,67 @@ async function processThought(
   rowId: string,
   text: string,
   channel: string,
-  ts: string,
+  threadAnchor: string,
   initialMetadata: Record<string, unknown>,
 ): Promise<void> {
+  // Track whether each piece succeeded so we can post the right reply.
+  let embedding: number[] | null = null;
+  let extracted: ExtractedMeta | null = null;
+
   try {
-    const [embedding, meta] = await Promise.all([
+    const results = await Promise.allSettled([
       getEmbedding(text),
       extractMetadata(text),
     ]);
+    if (results[0].status === "fulfilled") embedding = results[0].value;
+    else console.error("embedding failed:", results[0].reason);
 
-    const finalMetadata = {
-      ...initialMetadata,
-      type: meta.type,
-      category: meta.category,
-      people: meta.people,
-      action_items: meta.action_items,
-      dates_mentioned: meta.dates_mentioned,
-    };
+    if (results[1].status === "fulfilled") extracted = results[1].value;
+    else console.error("LLM extraction failed:", results[1].reason);
+
+    // Build final metadata. If LLM extraction failed, omit the extracted keys
+    // entirely (do NOT set them to null/empty — preserves the "field absent"
+    // signal for downstream queries).
+    const finalMetadata: Record<string, unknown> = { ...initialMetadata };
+    if (extracted) {
+      finalMetadata.type = extracted.type;
+      finalMetadata.category = extracted.category;
+      finalMetadata.people = extracted.people;
+      finalMetadata.action_items = extracted.action_items;
+      finalMetadata.dates_mentioned = extracted.dates_mentioned;
+    }
+
+    // Update the row. If embedding is null, skip embedding update so the row
+    // stays with content + base metadata (still searchable by other criteria,
+    // re-processable by future tooling).
+    const update: Record<string, unknown> = { metadata: finalMetadata };
+    if (embedding) update.embedding = embedding;
 
     const { error } = await supabase
       .from("thoughts")
-      .update({ embedding, metadata: finalMetadata })
+      .update(update)
       .eq("id", rowId);
-    if (error) throw new Error(`update failed: ${error.message}`);
+    if (error) {
+      console.error("row update failed:", error.message);
+      await slackReply(
+        channel,
+        threadAnchor,
+        "⚠️ Captured (raw text saved) but row update failed — check Edge Function logs.",
+      );
+      return;
+    }
 
-    await slackReply(channel, ts, buildConfirmationText(meta));
+    // Threaded reply: success path if extraction worked; degraded if not.
+    if (extracted) {
+      await slackReply(channel, threadAnchor, buildConfirmationText(extracted));
+    } else {
+      await slackReply(channel, threadAnchor, "✓ captured");
+    }
   } catch (err) {
     console.error("processThought error:", err);
     await slackReply(
       channel,
-      ts,
+      threadAnchor,
       "⚠️ Captured (raw text saved) but processing failed — check Edge Function logs.",
     );
   }
@@ -302,13 +345,27 @@ Deno.serve(async (req: Request): Promise<Response> => {
     .single();
 
   if (claimErr) {
-    // Unique violation = another invocation already claimed this message.
-    return new Response("ok");
+    // Postgres `23505` = unique_violation. Means another invocation already
+    // claimed this message (Slack's <3s timeout retry behavior). Return 200
+    // silently so Slack stops retrying.
+    if (claimErr.code === "23505") {
+      return new Response("ok");
+    }
+    // Any other error (DB outage, RLS misconfig, etc.) is a real failure.
+    // Log and return 500 so Slack retries (which is the desired behavior for
+    // transient errors).
+    console.error("claim insert failed:", claimErr.code, claimErr.message);
+    return new Response("error", { status: 500 });
   }
 
+  // Thread the bot's reply in the same thread as the user's message:
+  //   - top-level message: thread_ts = event.ts (starts a thread under it)
+  //   - thread reply:      thread_ts = event.thread_ts (joins the existing thread)
+  const replyThreadAnchor = threadTs ?? ts;
+
   // Background: embedding + LLM extraction + threaded reply.
-  EdgeRuntime.waitUntil(
-    processThought(claimed.id, text, channel, ts, initialMetadata),
+  runWhenIdle(
+    processThought(claimed.id, text, channel, replyThreadAnchor, initialMetadata),
   );
 
   return new Response("ok");
