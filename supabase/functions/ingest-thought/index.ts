@@ -302,6 +302,18 @@ Deno.serve(async (req: Request): Promise<Response> => {
   }
 
   const event = body.event as Record<string, unknown> | undefined;
+  // Filter chain (return 200 silent skip on rejection):
+  //   - !event || event.type !== "message": non-message events
+  //   - event.subtype truthy: edits (message_changed), deletes (message_deleted),
+  //     bot posts (bot_message), system events (channel_join, thread_broadcast,
+  //     me_message, file_share, etc.). All deferred to v1.5+ or out of scope.
+  //   - event.bot_id truthy: bot messages including our own confirmation reply
+  //
+  // The subtype and bot_id checks are REDUNDANT BY DESIGN. Slack inconsistently
+  // sets one or the other for bot-posted messages — historically, app-posted
+  // messages with as_user:false get bot_id but not subtype, while other bot
+  // posts get subtype:"bot_message". Keeping both checks is the only way to
+  // robustly prevent capture loops. Do not "simplify" by removing either.
   if (
     !event ||
     event.type !== "message" ||

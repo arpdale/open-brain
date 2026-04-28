@@ -7,7 +7,7 @@ Personal Slack-channel capture surface for Open Brain. Type in `#hey-otis` (in t
 ## What's in this folder
 
 - `README.md` — this file
-- `manifest.yml` — Slack app manifest (reproducibility; create app from this in Slack admin UI)
+- `manifest.yml` — Slack app manifest. **Canonical config + recovery path:** if you ever need to recreate the Slack app (lost workspace access, accidental deletion), this is the source of truth for scopes, events, and bot config. Keep accurate when you change scopes.
 
 The actual function source lives in `supabase/functions/ingest-thought/` and the schema migration in `supabase/migrations/20260428120000_add_idempotency_key.sql`. Both are required Supabase paths and can't move.
 
@@ -92,7 +92,7 @@ https://<project-ref>.supabase.co/functions/v1/ingest-thought
 1. In Slack app config → **Event Subscriptions** → toggle Enable.
 2. Request URL: paste the function URL from step 5.
 3. Slack POSTs a `url_verification` challenge. The function verifies the signature and responds with the challenge. Slack shows ✅ Verified.
-4. Subscribe to bot events: `message.channels` (and `message.groups` if `#hey-otis` is private).
+4. Subscribe to bot events. `message.channels` (public channels) and `message.groups` (private channels) are mutually exclusive for a given channel. **Recommended: subscribe to both** so the function works regardless of `#hey-otis`'s privacy setting (extra events for unrelated channels are dropped by the channel-ID filter inside the function).
 5. Save changes. Slack may prompt to reinstall the app — accept.
 
 ### 7. Invite the bot to the channel
