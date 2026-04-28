@@ -1,5 +1,3 @@
-"use server";
-
 import { createClient } from "@supabase/supabase-js";
 
 const EMBEDDING_PROVIDER_URL = "https://openrouter.ai/api/v1/embeddings";
@@ -19,10 +17,10 @@ export type SearchResponse = {
   error?: string;
 };
 
-export async function searchAction(
+export async function searchThoughts(
   query: string,
-  k = 10,
-  threshold = 0.7
+  k = 30,
+  threshold = 0.4
 ): Promise<SearchResponse> {
   const trimmed = query.trim();
   if (!trimmed) return { results: [], elapsed_ms: 0 };

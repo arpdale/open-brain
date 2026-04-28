@@ -38,21 +38,29 @@ export function ThoughtCard({ thought }: Props) {
   return (
     <Link
       href={`/t/${thought.id}`}
-      className="block rounded-lg border border-zinc-800 bg-zinc-900 p-4 hover:border-zinc-700 transition-colors"
+      className="block rounded-lg border border-zinc-200 bg-white p-4 hover:border-zinc-400 transition-colors dark:border-zinc-800 dark:bg-zinc-900 dark:hover:border-zinc-600"
     >
       <div className="flex items-center gap-2 text-xs text-zinc-500 mb-2">
         {source ? (
-          <span className="rounded bg-zinc-800 px-1.5 py-0.5 text-zinc-300">{source}</span>
+          <span className="rounded bg-zinc-100 px-1.5 py-0.5 text-zinc-700 dark:bg-zinc-800 dark:text-zinc-300">
+            {source}
+          </span>
         ) : null}
         {project ? (
-          <span className="rounded bg-zinc-800 px-1.5 py-0.5 text-zinc-300">{project}</span>
+          <span className="rounded bg-zinc-100 px-1.5 py-0.5 text-zinc-700 dark:bg-zinc-800 dark:text-zinc-300">
+            {project}
+          </span>
         ) : null}
         <span className="ml-auto">{relTime(thought.created_at)}</span>
       </div>
       {title ? (
-        <h3 className="text-sm font-medium text-zinc-100 mb-1 line-clamp-1">{title}</h3>
+        <h3 className="text-sm font-medium text-zinc-900 mb-1 line-clamp-1 dark:text-zinc-100">
+          {title}
+        </h3>
       ) : null}
-      <p className="text-sm text-zinc-400 line-clamp-3">{snippet(thought.content)}</p>
+      <p className="text-sm text-zinc-600 line-clamp-3 dark:text-zinc-400">
+        {snippet(thought.content)}
+      </p>
     </Link>
   );
 }

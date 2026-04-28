@@ -8,8 +8,8 @@ type Props = {
 
 function pillClass(active: boolean): string {
   return active
-    ? "inline-block rounded-full px-3 py-1 text-xs font-medium bg-zinc-100 text-zinc-900"
-    : "inline-block rounded-full px-3 py-1 text-xs font-medium bg-zinc-800 text-zinc-300 hover:bg-zinc-700";
+    ? "inline-block rounded-full px-3 py-1 text-xs font-medium bg-zinc-900 text-white dark:bg-zinc-100 dark:text-zinc-900"
+    : "inline-block rounded-full px-3 py-1 text-xs font-medium bg-zinc-100 text-zinc-700 hover:bg-zinc-200 dark:bg-zinc-800 dark:text-zinc-300 dark:hover:bg-zinc-700";
 }
 
 export function FilterPills({ facets, active }: Props) {
