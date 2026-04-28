@@ -1,5 +1,3 @@
-import "server-only";
-
 const COOKIE_NAME = "dashboard-session";
 const SESSION_TTL_DAYS = 30;
 
