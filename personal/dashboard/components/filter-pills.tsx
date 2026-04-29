@@ -12,7 +12,16 @@ function pillClass(active: boolean): string {
     : "inline-block rounded-full px-3 py-1 text-xs font-medium bg-zinc-100 text-zinc-700 hover:bg-zinc-200 dark:bg-zinc-800 dark:text-zinc-300 dark:hover:bg-zinc-700";
 }
 
+const SOURCE_ORDER = ["slack", "mcp", "claude", "chatgpt"];
+
+function orderSources(sources: string[]): string[] {
+  const known = SOURCE_ORDER.filter((s) => sources.includes(s));
+  const rest = sources.filter((s) => !SOURCE_ORDER.includes(s)).sort();
+  return [...known, ...rest];
+}
+
 export function FilterPills({ facets, active }: Props) {
+  const orderedSources = orderSources(facets.sources);
   const projects = active.source ? facets.projectsBySource[active.source] ?? [] : [];
   return (
     <div className="space-y-2">
@@ -21,7 +30,7 @@ export function FilterPills({ facets, active }: Props) {
         <Link href="/" className={pillClass(!active.source)}>
           all
         </Link>
-        {facets.sources.map((s) => (
+        {orderedSources.map((s) => (
           <Link
             key={s}
             href={`/?source=${encodeURIComponent(s)}`}

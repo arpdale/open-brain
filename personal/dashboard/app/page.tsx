@@ -36,7 +36,7 @@ export default async function BrowsePage({
     <main className="min-h-screen bg-zinc-50 text-zinc-900 dark:bg-zinc-950 dark:text-zinc-100">
       <div className="mx-auto max-w-3xl p-6 space-y-6">
         <header className="flex items-center justify-between">
-          <h1 className="text-lg font-medium">Open Brain</h1>
+          <h1 className="text-2xl font-bold tracking-tight">OTIS</h1>
           <div className="flex items-center gap-2">
             <ThemeToggle initial={theme} />
             <form action="/api/auth/logout" method="post">
