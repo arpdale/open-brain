@@ -24,56 +24,52 @@ export type SearchResponse = {
 // bottom by similarity DESC anyway, and the user can ignore them.
 //
 // Sweep here only if MCP and dashboard search disagree on the same query.
-export async function searchThoughts(
+const DEFAULT_THRESHOLD = 0.2;
+
+/**
+ * Core retrieval: embed query → match_thoughts RPC → return top-K rows.
+ * Shared by Search-mode rendering and Ask-mode synthesis.
+ */
+export async function retrieveTopK(
   query: string,
-  k = 30,
-  threshold = 0.2
-): Promise<SearchResponse> {
+  k: number,
+  threshold = DEFAULT_THRESHOLD
+): Promise<SearchResult[]> {
   const trimmed = query.trim();
-  if (!trimmed) return { results: [], elapsed_ms: 0 };
-  if (trimmed.length > 2000) return { results: [], elapsed_ms: 0, error: "Query too long" };
+  if (!trimmed) return [];
+  if (trimmed.length > 2000) return [];
   const safeK = Math.min(50, Math.max(1, Math.floor(k)));
   const safeThreshold = Math.min(1, Math.max(0, threshold));
 
-  const start = Date.now();
   const orKey = process.env.OPENROUTER_API_KEY;
   const url = process.env.SUPABASE_URL;
   const key = process.env.SUPABASE_SERVICE_ROLE_KEY;
   if (!orKey || !url || !key) {
-    return { results: [], elapsed_ms: 0, error: "Missing env config" };
+    throw new Error("Missing env config (OPENROUTER_API_KEY / SUPABASE_URL / SUPABASE_SERVICE_ROLE_KEY)");
   }
 
-  let embedding: number[];
-  try {
-    const r = await fetch(EMBEDDING_PROVIDER_URL, {
-      method: "POST",
-      headers: {
-        Authorization: `Bearer ${orKey}`,
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({ model: EMBEDDING_MODEL, input: trimmed }),
-    });
-    if (!r.ok) {
-      return { results: [], elapsed_ms: Date.now() - start, error: `Embedding API ${r.status}` };
-    }
-    const json = (await r.json()) as { data?: Array<{ embedding: number[] }> };
-    const e = json.data?.[0]?.embedding;
-    if (!e || !Array.isArray(e)) {
-      return { results: [], elapsed_ms: Date.now() - start, error: "Embedding response malformed" };
-    }
-    embedding = e;
-  } catch (err) {
-    return {
-      results: [],
-      elapsed_ms: Date.now() - start,
-      error: `Embedding fetch failed: ${(err as Error).message}`,
-    };
+  // Embed the query
+  const embedRes = await fetch(EMBEDDING_PROVIDER_URL, {
+    method: "POST",
+    headers: {
+      Authorization: `Bearer ${orKey}`,
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({ model: EMBEDDING_MODEL, input: trimmed }),
+  });
+  if (!embedRes.ok) {
+    throw new Error(`Embedding API ${embedRes.status}`);
+  }
+  const embedJson = (await embedRes.json()) as { data?: Array<{ embedding: number[] }> };
+  const embedding = embedJson.data?.[0]?.embedding;
+  if (!embedding || !Array.isArray(embedding)) {
+    throw new Error("Embedding response malformed");
   }
 
+  // Match thoughts via Supabase RPC
   const supa = createClient(url, key, {
     auth: { persistSession: false, autoRefreshToken: false },
   });
-
   const { data, error } = await supa.rpc("match_thoughts", {
     query_embedding: embedding as unknown as number[],
     match_threshold: safeThreshold,
@@ -81,11 +77,29 @@ export async function searchThoughts(
     filter: {},
   });
   if (error) {
-    return { results: [], elapsed_ms: Date.now() - start, error: `match_thoughts: ${error.message}` };
+    throw new Error(`match_thoughts: ${error.message}`);
   }
+  return (data ?? []) as SearchResult[];
+}
 
-  return {
-    results: (data ?? []) as SearchResult[],
-    elapsed_ms: Date.now() - start,
-  };
+/**
+ * Existing public API for Search-mode pages that want the full {results, elapsed_ms, error} shape.
+ * Wraps retrieveTopK() with timing + error capture.
+ */
+export async function searchThoughts(
+  query: string,
+  k = 30,
+  threshold = DEFAULT_THRESHOLD
+): Promise<SearchResponse> {
+  const start = Date.now();
+  try {
+    const results = await retrieveTopK(query, k, threshold);
+    return { results, elapsed_ms: Date.now() - start };
+  } catch (err) {
+    return {
+      results: [],
+      elapsed_ms: Date.now() - start,
+      error: (err as Error).message,
+    };
+  }
 }
