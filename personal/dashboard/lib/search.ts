@@ -17,10 +17,17 @@ export type SearchResponse = {
   error?: string;
 };
 
+// Default threshold tuned for text-embedding-3-small at our corpus scale
+// (130–10k thoughts). Short single-word queries top out at ~0.30–0.35 cosine
+// similarity, so a 0.4 default returns zero results for most one-word inputs.
+// 0.2 keeps the long tail of weakly-related results visible — they sort to the
+// bottom by similarity DESC anyway, and the user can ignore them.
+//
+// Sweep here only if MCP and dashboard search disagree on the same query.
 export async function searchThoughts(
   query: string,
   k = 30,
-  threshold = 0.4
+  threshold = 0.2
 ): Promise<SearchResponse> {
   const trimmed = query.trim();
   if (!trimmed) return { results: [], elapsed_ms: 0 };
