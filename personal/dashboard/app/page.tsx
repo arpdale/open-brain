@@ -1,15 +1,21 @@
+import { Suspense } from "react";
 import Link from "next/link";
 import { decodeCursor, distinctMetadataValues, listThoughts } from "@/lib/db";
-import { searchThoughts } from "@/lib/search";
+import { retrieveTopK } from "@/lib/search";
 import { readTheme } from "@/lib/theme";
 import { FilterPills } from "@/components/filter-pills";
 import { SearchBar } from "@/components/search-bar";
 import { SearchResults } from "@/components/search-results";
+import { SynthesisAnswer } from "@/components/synthesis-answer";
+import { SynthesisFallback } from "@/components/synthesis-fallback";
 import { ThemeToggle } from "@/components/theme-toggle";
 import { ThoughtCard } from "@/components/thought-card";
 
+type Mode = "ask" | "search";
+
 type SearchParams = Promise<{
   q?: string;
+  mode?: string;
   source?: string;
   project?: string;
   cursor?: string;
@@ -22,6 +28,8 @@ export default async function BrowsePage({
 }) {
   const sp = await searchParams;
   const query = sp.q?.trim() ?? "";
+  const rawMode = sp.mode;
+  const mode: Mode = rawMode === "search" ? "search" : "ask"; // default ask
   const theme = await readTheme();
 
   return (
@@ -42,22 +50,71 @@ export default async function BrowsePage({
           </div>
         </header>
 
-        <SearchBar initialQuery={query} />
+        <SearchBar initialQuery={query} initialMode={mode} />
 
-        {query ? <SearchView query={query} /> : <BrowseView sp={sp} />}
+        {query ? (
+          mode === "ask" ? (
+            <AskView query={query} />
+          ) : (
+            <SearchView query={query} />
+          )
+        ) : (
+          <BrowseView sp={sp} />
+        )}
       </div>
     </main>
   );
 }
 
+async function AskView({ query }: { query: string }) {
+  // Retrieve top-8 sources at the page level. Pass to both the synthesis
+  // component (wrapped in <Suspense> — the slow path) and the card list
+  // (renders synchronously alongside).
+  let sources;
+  try {
+    sources = await retrieveTopK(query, 8);
+  } catch (err) {
+    return (
+      <div className="rounded-lg border border-amber-300 bg-amber-50 p-4 text-sm text-amber-900 dark:border-amber-700 dark:bg-amber-950 dark:text-amber-200">
+        Search degraded: {(err as Error).message}
+      </div>
+    );
+  }
+
+  return (
+    <div className="space-y-6">
+      <Suspense fallback={<SynthesisFallback />}>
+        <SynthesisAnswer q={query} sources={sources} />
+      </Suspense>
+      <SearchResults
+        results={sources}
+        query={query}
+        anchored
+      />
+    </div>
+  );
+}
+
 async function SearchView({ query }: { query: string }) {
-  const { results, elapsed_ms, error } = await searchThoughts(query);
+  const start = Date.now();
+  let sources;
+  try {
+    sources = await retrieveTopK(query, 30);
+  } catch (err) {
+    return (
+      <SearchResults
+        results={[]}
+        query={query}
+        elapsedMs={Date.now() - start}
+        error={(err as Error).message}
+      />
+    );
+  }
   return (
     <SearchResults
-      results={results}
+      results={sources}
       query={query}
-      elapsedMs={elapsed_ms}
-      error={error}
+      elapsedMs={Date.now() - start}
     />
   );
 }
