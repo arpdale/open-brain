@@ -12,6 +12,8 @@ const OPENROUTER_API_KEY = Deno.env.get("OPENROUTER_API_KEY")!;
 const MCP_ACCESS_KEY = Deno.env.get("MCP_ACCESS_KEY")!;
 
 const OPENROUTER_BASE = "https://openrouter.ai/api/v1";
+const EMBEDDING_PROVIDER = "openrouter";
+const EMBEDDING_MODEL = "openai/text-embedding-3-small";
 const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY);
 
 async function getEmbedding(text: string): Promise<number[]> {
@@ -22,7 +24,7 @@ async function getEmbedding(text: string): Promise<number[]> {
       "Content-Type": "application/json",
     },
     body: JSON.stringify({
-      model: "openai/text-embedding-3-small",
+      model: EMBEDDING_MODEL,
       input: text,
     }),
   });
@@ -318,7 +320,14 @@ server.registerTool(
 
       const { data: upsertResult, error: upsertError } = await supabase.rpc("upsert_thought", {
         p_content: content,
-        p_payload: { metadata: { ...metadata, source: "mcp" } },
+        p_payload: {
+          metadata: {
+            ...metadata,
+            source: "mcp",
+            embedding_provider: EMBEDDING_PROVIDER,
+            embedding_model: EMBEDDING_MODEL,
+          },
+        },
       });
 
       if (upsertError) {
