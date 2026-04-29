@@ -100,7 +100,7 @@ https://<project-ref>.supabase.co/functions/v1/ingest-thought
 In Slack, in `#hey-otis`:
 
 ```
-/invite @hey-otis
+/invite @otis-bot
 ```
 
 ### 8. Smoke test
