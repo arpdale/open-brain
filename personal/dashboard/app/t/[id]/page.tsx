@@ -3,6 +3,7 @@ import { notFound } from "next/navigation";
 import { getNeighbors, getThought } from "@/lib/db";
 import { readTheme } from "@/lib/theme";
 import { ConnectedPanel } from "@/components/connected-panel";
+import { Markdown } from "@/components/markdown";
 import { ThemeToggle } from "@/components/theme-toggle";
 
 type Params = Promise<{ id: string }>;
@@ -60,9 +61,9 @@ export default async function ThoughtDetailPage({ params }: { params: Params }) 
               ) : null}
             </div>
             {title ? <h1 className="text-xl font-medium">{title}</h1> : null}
-            <pre className="whitespace-pre-wrap break-words text-sm font-sans leading-relaxed text-zinc-800 dark:text-zinc-200">
-              {thought.content}
-            </pre>
+            <div className="rounded-lg border border-zinc-200 bg-white p-5 dark:border-zinc-800 dark:bg-zinc-900">
+              <Markdown>{thought.content}</Markdown>
+            </div>
 
             <details className="rounded border border-zinc-200 bg-white dark:border-zinc-800 dark:bg-zinc-900">
               <summary className="cursor-pointer px-3 py-2 text-xs text-zinc-500 hover:text-zinc-900 dark:hover:text-zinc-100">

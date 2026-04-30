@@ -1,5 +1,6 @@
 import Link from "next/link";
 import type { SearchResult } from "@/lib/search";
+import { extractTitle, stripMarkdown } from "@/lib/markdown";
 
 type Props = {
   results: SearchResult[];
@@ -12,9 +13,9 @@ type Props = {
 };
 
 function snippet(content: string, max = 220): string {
-  const trimmed = content.trim();
-  if (trimmed.length <= max) return trimmed;
-  return trimmed.slice(0, max).replace(/\s+\S*$/, "") + "…";
+  const cleaned = stripMarkdown(content);
+  if (cleaned.length <= max) return cleaned;
+  return cleaned.slice(0, max).replace(/\s+\S*$/, "") + "…";
 }
 
 export function SearchResults({ results, query, elapsedMs, error, anchored = false }: Props) {
@@ -50,7 +51,8 @@ export function SearchResults({ results, query, elapsedMs, error, anchored = fal
               : null;
           const titleKey = source ? `${source}_conversation_title` : null;
           const title =
-            titleKey && typeof md[titleKey] === "string" ? (md[titleKey] as string) : null;
+            (titleKey && typeof md[titleKey] === "string" ? (md[titleKey] as string) : null) ||
+            extractTitle(r.content);
 
           return (
             <Link
