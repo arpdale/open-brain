@@ -36,6 +36,15 @@ export function SearchBar({
     router.push(qs ? `${pathname}?${qs}` : pathname);
   }
 
+  function handleKeyDown(e: React.KeyboardEvent<HTMLInputElement>) {
+    // Escape clears the input and returns to the default dashboard ("/").
+    if (e.key === "Escape") {
+      e.preventDefault();
+      setValue("");
+      router.push(pathname);
+    }
+  }
+
   const hasInput = value.trim().length > 0;
 
   return (
@@ -47,6 +56,7 @@ export function SearchBar({
           type="text"
           value={value}
           onChange={(e) => setValue(e.target.value)}
+          onKeyDown={handleKeyDown}
           placeholder={
             mode === "ask"
               ? "Ask your brain a question…"

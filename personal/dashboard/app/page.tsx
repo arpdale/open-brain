@@ -36,7 +36,13 @@ export default async function BrowsePage({
     <main className="min-h-screen bg-zinc-50 text-zinc-900 dark:bg-zinc-950 dark:text-zinc-100">
       <div className="mx-auto max-w-3xl p-6 space-y-6">
         <header className="flex items-center justify-between">
-          <h1 className="text-2xl font-bold tracking-tight">OTIS</h1>
+          <Link
+            href="/"
+            className="text-2xl font-bold tracking-tight hover:text-zinc-600 dark:hover:text-zinc-300"
+            aria-label="Home — clear query and filters"
+          >
+            OTIS
+          </Link>
           <div className="flex items-center gap-2">
             <ThemeToggle initial={theme} />
             <form action="/api/auth/logout" method="post">
@@ -50,7 +56,11 @@ export default async function BrowsePage({
           </div>
         </header>
 
-        <SearchBar initialQuery={query} initialMode={mode} />
+        {/* key forces a fresh mount when q/mode changes, so client-side
+            state (input value, mode toggle) follows the URL. Without this,
+            clicking OTIS clears the URL but the searchbox still shows the
+            stale query. */}
+        <SearchBar key={`${query}-${mode}`} initialQuery={query} initialMode={mode} />
 
         {query ? (
           mode === "ask" ? (
