@@ -1,8 +1,9 @@
-import Link from "next/link";
 import { notFound } from "next/navigation";
 import { getNeighbors, getThought } from "@/lib/db";
 import { readTheme } from "@/lib/theme";
+import { BackLink } from "@/components/back-link";
 import { ConnectedPanel } from "@/components/connected-panel";
+import { Markdown } from "@/components/markdown";
 import { ThemeToggle } from "@/components/theme-toggle";
 
 type Params = Promise<{ id: string }>;
@@ -31,12 +32,7 @@ export default async function ThoughtDetailPage({ params }: { params: Params }) 
     <main className="min-h-screen bg-zinc-50 text-zinc-900 dark:bg-zinc-950 dark:text-zinc-100">
       <div className="mx-auto max-w-4xl p-6 space-y-6">
         <header className="flex items-center justify-between">
-          <Link
-            href="/"
-            className="text-sm text-zinc-500 hover:text-zinc-900 dark:hover:text-zinc-100"
-          >
-            ← Browse
-          </Link>
+          <BackLink>← Browse</BackLink>
           <div className="flex items-center gap-2">
             <span className="text-xs text-zinc-500">
               {new Date(thought.created_at).toLocaleString()}
@@ -60,9 +56,9 @@ export default async function ThoughtDetailPage({ params }: { params: Params }) 
               ) : null}
             </div>
             {title ? <h1 className="text-xl font-medium">{title}</h1> : null}
-            <pre className="whitespace-pre-wrap break-words text-sm font-sans leading-relaxed text-zinc-800 dark:text-zinc-200">
-              {thought.content}
-            </pre>
+            <div className="rounded-lg border border-zinc-200 bg-white p-5 dark:border-zinc-800 dark:bg-zinc-900">
+              <Markdown>{thought.content}</Markdown>
+            </div>
 
             <details className="rounded border border-zinc-200 bg-white dark:border-zinc-800 dark:bg-zinc-900">
               <summary className="cursor-pointer px-3 py-2 text-xs text-zinc-500 hover:text-zinc-900 dark:hover:text-zinc-100">

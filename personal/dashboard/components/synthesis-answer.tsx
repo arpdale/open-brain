@@ -1,4 +1,5 @@
 import "server-only";
+import Link from "next/link";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 import { synthesize } from "@/lib/synthesize";
@@ -10,50 +11,52 @@ type Props = {
   sources: SearchResult[];
 };
 
-// Renders citation tokens like [1], [1, 2], [1][2] as anchor links to #card-{N}.
-// Walks each rendered text node from react-markdown, splits on the citation
-// pattern, and replaces matches with <a> elements. Skips text inside <code>
-// blocks because react-markdown calls a separate `code` component for those —
-// our `text` renderer never sees code-block contents.
-function renderTextWithCitations(value: string): (string | React.ReactNode)[] {
-  // Match either [1] or [1, 2] / [1,2] — single token can hold multiple refs
+// Renders citation tokens like [1], [1, 2], [1][2] as Next links to the
+// detail page of the cited thought. Out-of-range numbers (LLM hallucinated
+// citation) fall back to plaintext.
+function renderTextWithCitations(
+  value: string,
+  sources: SearchResult[],
+): (string | React.ReactNode)[] {
   const pattern = /\[(\d+(?:\s*,\s*\d+)*)\]/g;
   const parts: (string | React.ReactNode)[] = [];
   let lastIndex = 0;
   let match: RegExpExecArray | null;
   let key = 0;
 
+  const linkFor = (n: number) => {
+    const src = sources[n - 1];
+    if (!src) return null;
+    return (
+      <Link
+        key={`cite-${key++}`}
+        href={`/t/${src.id}`}
+        prefetch={false}
+        className="inline-block px-1 text-xs font-medium text-blue-600 hover:underline dark:text-blue-400"
+      >
+        [{n}]
+      </Link>
+    );
+  };
+
   while ((match = pattern.exec(value)) !== null) {
     if (match.index > lastIndex) {
       parts.push(value.slice(lastIndex, match.index));
     }
-    const numbers = match[1].split(/\s*,\s*/).map((s) => parseInt(s, 10)).filter((n) => Number.isFinite(n));
-    if (numbers.length === 0) {
-      parts.push(match[0]);
-    } else if (numbers.length === 1) {
-      const n = numbers[0];
-      parts.push(
-        <a
-          key={`cite-${key++}`}
-          href={`#card-${n}`}
-          className="inline-block px-1 text-xs font-medium text-blue-600 hover:underline dark:text-blue-400"
-        >
-          [{n}]
-        </a>,
-      );
+    const numbers = match[1]
+      .split(/\s*,\s*/)
+      .map((s) => parseInt(s, 10))
+      .filter((n) => Number.isFinite(n));
+
+    const rendered: React.ReactNode[] = [];
+    for (const n of numbers) {
+      const node = linkFor(n);
+      if (node) rendered.push(node);
+    }
+    if (rendered.length === 0) {
+      parts.push(match[0]); // out-of-range — keep literal text
     } else {
-      // [1, 2] → render each as its own anchor
-      for (const n of numbers) {
-        parts.push(
-          <a
-            key={`cite-${key++}`}
-            href={`#card-${n}`}
-            className="inline-block px-1 text-xs font-medium text-blue-600 hover:underline dark:text-blue-400"
-          >
-            [{n}]
-          </a>,
-        );
-      }
+      parts.push(...rendered);
     }
     lastIndex = pattern.lastIndex;
   }
@@ -85,12 +88,12 @@ export async function SynthesisAnswer({ q, sources }: Props) {
               <p {...rest}>
                 {Array.isArray(children)
                   ? children.flatMap((c, i) =>
-                      typeof c === "string" ? renderTextWithCitations(c).map((part, j) => (
+                      typeof c === "string" ? renderTextWithCitations(c, sources).map((part, j) => (
                         typeof part === "string" ? <span key={`p-${i}-${j}`}>{part}</span> : part
                       )) : [c],
                     )
                   : typeof children === "string"
-                    ? renderTextWithCitations(children)
+                    ? renderTextWithCitations(children, sources)
                     : children}
               </p>
             );
@@ -100,12 +103,12 @@ export async function SynthesisAnswer({ q, sources }: Props) {
               <li {...rest}>
                 {Array.isArray(children)
                   ? children.flatMap((c, i) =>
-                      typeof c === "string" ? renderTextWithCitations(c).map((part, j) => (
+                      typeof c === "string" ? renderTextWithCitations(c, sources).map((part, j) => (
                         typeof part === "string" ? <span key={`li-${i}-${j}`}>{part}</span> : part
                       )) : [c],
                     )
                   : typeof children === "string"
-                    ? renderTextWithCitations(children)
+                    ? renderTextWithCitations(children, sources)
                     : children}
               </li>
             );

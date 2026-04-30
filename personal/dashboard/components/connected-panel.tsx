@@ -1,5 +1,6 @@
 import Link from "next/link";
 import type { Thought } from "@/lib/db";
+import { extractTitle, stripMarkdown } from "@/lib/markdown";
 
 type Props = { neighbors: Thought[] };
 
@@ -25,9 +26,10 @@ export function ConnectedPanel({ neighbors }: Props) {
           const md = n.metadata ?? {};
           const source = typeof md.source === "string" ? md.source : null;
           const title =
-            source && typeof md[`${source}_conversation_title`] === "string"
+            (source && typeof md[`${source}_conversation_title`] === "string"
               ? (md[`${source}_conversation_title`] as string)
-              : null;
+              : null) || extractTitle(n.content);
+          const cleaned = stripMarkdown(n.content).slice(0, 160);
           return (
             <li key={n.id}>
               <Link
@@ -45,7 +47,7 @@ export function ConnectedPanel({ neighbors }: Props) {
                   <div className="text-sm text-zinc-900 line-clamp-1 dark:text-zinc-100">{title}</div>
                 ) : null}
                 <div className="text-xs text-zinc-600 line-clamp-2 mt-0.5 dark:text-zinc-400">
-                  {n.content.trim().slice(0, 160)}
+                  {cleaned}
                 </div>
               </Link>
             </li>

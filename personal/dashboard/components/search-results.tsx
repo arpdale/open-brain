@@ -1,5 +1,6 @@
 import Link from "next/link";
 import type { SearchResult } from "@/lib/search";
+import { extractTitle, stripMarkdown } from "@/lib/markdown";
 
 type Props = {
   results: SearchResult[];
@@ -12,9 +13,9 @@ type Props = {
 };
 
 function snippet(content: string, max = 220): string {
-  const trimmed = content.trim();
-  if (trimmed.length <= max) return trimmed;
-  return trimmed.slice(0, max).replace(/\s+\S*$/, "") + "…";
+  const cleaned = stripMarkdown(content);
+  if (cleaned.length <= max) return cleaned;
+  return cleaned.slice(0, max).replace(/\s+\S*$/, "") + "…";
 }
 
 export function SearchResults({ results, query, elapsedMs, error, anchored = false }: Props) {
@@ -50,14 +51,14 @@ export function SearchResults({ results, query, elapsedMs, error, anchored = fal
               : null;
           const titleKey = source ? `${source}_conversation_title` : null;
           const title =
-            titleKey && typeof md[titleKey] === "string" ? (md[titleKey] as string) : null;
+            (titleKey && typeof md[titleKey] === "string" ? (md[titleKey] as string) : null) ||
+            extractTitle(r.content);
 
           return (
             <Link
               key={r.id}
-              id={anchored ? `card-${i + 1}` : undefined}
               href={`/t/${r.id}`}
-              className="block scroll-mt-20 rounded-lg border border-zinc-200 bg-white p-4 hover:border-zinc-400 transition-colors dark:border-zinc-800 dark:bg-zinc-900 dark:hover:border-zinc-600"
+              className="block rounded-lg border border-zinc-200 bg-white p-4 hover:border-zinc-400 transition-colors dark:border-zinc-800 dark:bg-zinc-900 dark:hover:border-zinc-600"
             >
               <div className="flex items-center gap-2 text-xs text-zinc-500 mb-2">
                 {anchored ? (
