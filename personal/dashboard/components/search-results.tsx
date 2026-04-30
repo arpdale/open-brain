@@ -57,9 +57,8 @@ export function SearchResults({ results, query, elapsedMs, error, anchored = fal
           return (
             <Link
               key={r.id}
-              id={anchored ? `card-${i + 1}` : undefined}
               href={`/t/${r.id}`}
-              className="block scroll-mt-20 rounded-lg border border-zinc-200 bg-white p-4 hover:border-zinc-400 transition-colors dark:border-zinc-800 dark:bg-zinc-900 dark:hover:border-zinc-600"
+              className="block rounded-lg border border-zinc-200 bg-white p-4 hover:border-zinc-400 transition-colors dark:border-zinc-800 dark:bg-zinc-900 dark:hover:border-zinc-600"
             >
               <div className="flex items-center gap-2 text-xs text-zinc-500 mb-2">
                 {anchored ? (
