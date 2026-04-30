@@ -1,7 +1,7 @@
-import Link from "next/link";
 import { notFound } from "next/navigation";
 import { getNeighbors, getThought } from "@/lib/db";
 import { readTheme } from "@/lib/theme";
+import { BackLink } from "@/components/back-link";
 import { ConnectedPanel } from "@/components/connected-panel";
 import { Markdown } from "@/components/markdown";
 import { ThemeToggle } from "@/components/theme-toggle";
@@ -32,12 +32,7 @@ export default async function ThoughtDetailPage({ params }: { params: Params }) 
     <main className="min-h-screen bg-zinc-50 text-zinc-900 dark:bg-zinc-950 dark:text-zinc-100">
       <div className="mx-auto max-w-4xl p-6 space-y-6">
         <header className="flex items-center justify-between">
-          <Link
-            href="/"
-            className="text-sm text-zinc-500 hover:text-zinc-900 dark:hover:text-zinc-100"
-          >
-            ← Browse
-          </Link>
+          <BackLink>← Browse</BackLink>
           <div className="flex items-center gap-2">
             <span className="text-xs text-zinc-500">
               {new Date(thought.created_at).toLocaleString()}
