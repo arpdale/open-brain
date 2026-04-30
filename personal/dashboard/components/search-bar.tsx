@@ -36,16 +36,28 @@ export function SearchBar({
     router.push(qs ? `${pathname}?${qs}` : pathname);
   }
 
+  function clear() {
+    setValue("");
+    router.push(pathname);
+  }
+
   function handleKeyDown(e: React.KeyboardEvent<HTMLInputElement>) {
-    // Escape clears the input and returns to the default dashboard ("/").
-    if (e.key === "Escape") {
+    // Forward-delete (Delete key on Windows, fn+delete on Mac) clears the
+    // input and returns to the default dashboard. Mirrors the on-screen DEL
+    // button when the query is in submitted state.
+    if (e.key === "Delete") {
       e.preventDefault();
-      setValue("");
-      router.push(pathname);
+      clear();
     }
   }
 
-  const hasInput = value.trim().length > 0;
+  const trimmed = value.trim();
+  const hasInput = trimmed.length > 0;
+  // "Submitted" = current input matches the active URL query exactly. After
+  // a submit lands, swap the dark primary submit button for a gray DEL button
+  // (secondary action) so users have a one-click way home. Editing the input
+  // afterwards switches back to the submit button.
+  const isSubmitted = hasInput && trimmed === initialQuery.trim();
 
   return (
     <div className="space-y-2">
@@ -64,7 +76,16 @@ export function SearchBar({
           }
           className="w-full rounded-lg border border-zinc-300 bg-white px-4 py-2.5 pr-12 text-sm text-zinc-900 placeholder:text-zinc-400 focus:outline-none focus:border-zinc-500 focus:ring-2 focus:ring-zinc-200 dark:border-zinc-700 dark:bg-zinc-900 dark:text-zinc-100 dark:placeholder:text-zinc-500 dark:focus:border-zinc-500 dark:focus:ring-zinc-700"
         />
-        {hasInput ? (
+        {isSubmitted ? (
+          <button
+            type="button"
+            onClick={clear}
+            aria-label="Clear query and return to default dashboard"
+            className="absolute right-2 top-1/2 -translate-y-1/2 flex h-7 items-center justify-center rounded-md bg-zinc-200 px-2 text-[11px] font-semibold tracking-wide text-zinc-700 transition-colors hover:bg-zinc-300 dark:bg-zinc-700 dark:text-zinc-200 dark:hover:bg-zinc-600"
+          >
+            DEL
+          </button>
+        ) : hasInput ? (
           <button
             type="submit"
             aria-label={mode === "ask" ? "Ask" : "Search"}
