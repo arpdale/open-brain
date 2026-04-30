@@ -1,6 +1,6 @@
 "use client";
 
-import { useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 
 type Mode = "ask" | "search";
@@ -41,16 +41,6 @@ export function SearchBar({
     router.push(pathname);
   }
 
-  function handleKeyDown(e: React.KeyboardEvent<HTMLInputElement>) {
-    // Forward-delete (Delete key on Windows, fn+delete on Mac) clears the
-    // input and returns to the default dashboard. Mirrors the on-screen DEL
-    // button when the query is in submitted state.
-    if (e.key === "Delete") {
-      e.preventDefault();
-      clear();
-    }
-  }
-
   const trimmed = value.trim();
   const hasInput = trimmed.length > 0;
   // "Submitted" = current input matches the active URL query exactly. After
@@ -58,6 +48,27 @@ export function SearchBar({
   // (secondary action) so users have a one-click way home. Editing the input
   // afterwards switches back to the submit button.
   const isSubmitted = hasInput && trimmed === initialQuery.trim();
+
+  // Window-level Delete-key handler so the user doesn't have to focus the
+  // searchbox to clear. Only active when there's a submitted query, and
+  // only when no editable element has focus (so Delete still does its
+  // normal thing inside inputs/textareas/contenteditable).
+  useEffect(() => {
+    if (!isSubmitted) return;
+    function onKey(e: KeyboardEvent) {
+      if (e.key !== "Delete") return;
+      const t = e.target as HTMLElement | null;
+      const tag = t?.tagName;
+      const isEditable =
+        tag === "INPUT" || tag === "TEXTAREA" || (t?.isContentEditable ?? false);
+      if (isEditable) return;
+      e.preventDefault();
+      setValue("");
+      router.push(pathname);
+    }
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [isSubmitted, pathname, router]);
 
   return (
     <div className="space-y-2">
@@ -68,7 +79,6 @@ export function SearchBar({
           type="text"
           value={value}
           onChange={(e) => setValue(e.target.value)}
-          onKeyDown={handleKeyDown}
           placeholder={
             mode === "ask"
               ? "Ask your brain a question…"
