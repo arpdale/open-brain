@@ -14,3 +14,12 @@ html {
 html[data-theme="dark"] {
   color-scheme: dark;
 }
+
+/* Form inputs at 16px on every device. WCAG 1.4.4 floor; also kills iOS
+   Safari's auto-zoom-on-focus (which kicks in below 16px). Unlayered →
+   wins over Tailwind's @layer utilities without !important. */
+input,
+textarea,
+select {
+  font-size: 16px;
+}
