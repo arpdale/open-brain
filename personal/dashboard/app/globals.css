@@ -14,3 +14,17 @@ html {
 html[data-theme="dark"] {
   color-scheme: dark;
 }
+
+/* iOS Safari auto-zooms on focused form fields whose computed font-size is
+   under 16px and never unzooms, leaving the layout overflowing right.
+   `(hover: none)` matches touch devices (phones + iPads) regardless of
+   viewport width, so iPad portrait (768px, where sm:text-sm would otherwise
+   apply) is covered too. Unlayered → wins over Tailwind's @layer utilities
+   without needing !important. */
+@media (hover: none) {
+  input,
+  textarea,
+  select {
+    font-size: 16px;
+  }
+}
