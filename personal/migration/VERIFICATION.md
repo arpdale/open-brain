@@ -87,9 +87,12 @@ cannot be ruled out; monitor old endpoint callers without printing URL keys.
 
 ## Remaining limitations
 
-Synthetic tests deliberately sent no Slack messages. Signed challenge, durable
-enrichment and recovery were tested; live threaded confirmation delivery remains
-unverified until an explicitly authorized temporary message is sent. Slack replies are now enabled in production.
+Synthetic tests deliberately sent no Slack messages. At 18:54 UTC, the user's
+real ITD310 capture completed on its first queue attempt, persisted in Neon with
+a 1536-dimensional embedding, appeared through the actual MCP semantic-search
+tool, and received a threaded bot confirmation verified through Slack's API.
+This legitimate user record was retained. The 762-row hashes above describe the
+cutover baseline, not the expected size or hash of the database after new writes.
 Slack confirmation is at least once around a crash between send and checkpoint;
 database content and queue claims are idempotent. Queue delivery exhaustion or
 24-hour expiry leaves durable database jobs for authenticated manual recovery.
