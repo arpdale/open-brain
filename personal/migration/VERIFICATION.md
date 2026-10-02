@@ -9,7 +9,7 @@ and functions remain available for rollback. No retirement was performed.
 - Worker: `https://open-brain-neon.arpdale.workers.dev`
 - Worker version: `d57a22a9e91a4bcfa13d8307418ba4b7`
 - Dashboard: `https://hey-otis.vercel.app`
-- Vercel deployment: `dpl_ByTfCfDMDtqY2LwJVHjAKFYEiQ4J`
+- Initial verified production deployment: `dpl_ByTfCfDMDtqY2LwJVHjAKFYEiQ4J` (subsequent pushes to the production branch deploy automatically)
 - Neon: `silent-wave-89224791`, branch `br-late-cloud-b4nyht2e`
 - Queues: `open-brain-enrichment` and `open-brain-enrichment-dlq`
 
