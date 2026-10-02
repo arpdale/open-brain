@@ -1,0 +1,16 @@
+{
+  "name": "open-brain-deployed-verification",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "verify": "node verify.mjs",
+    "verify:slack": "node slack.mjs",
+    "verify:importer": "node importer.mjs",
+    "verify:dashboard": "node dashboard.mjs",
+    "verify:slack-legacy": "node slack-legacy.mjs"
+  },
+  "dependencies": {
+    "@modelcontextprotocol/sdk": "1.31.0",
+    "@neondatabase/serverless": "1.0.2"
+  }
+}

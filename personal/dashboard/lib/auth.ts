@@ -113,7 +113,11 @@ export function clearSessionCookie(): { name: string; value: string; options: Co
 
 export async function isSessionValid(cookieValue: string | undefined): Promise<boolean> {
   if (!cookieValue) return false;
-  return (await verify(cookieValue)) !== null;
+  try {
+    return (await verify(cookieValue)) !== null;
+  } catch {
+    return false; // Malformed cookies are unauthenticated, not runtime errors.
+  }
 }
 
 export function checkPassword(supplied: string): boolean {

@@ -1,5 +1,5 @@
 import "server-only";
-import { createClient, type SupabaseClient } from "@supabase/supabase-js";
+import { neon } from "@neondatabase/serverless";
 
 export type Thought = {
   id: string;
@@ -7,164 +7,94 @@ export type Thought = {
   metadata: Record<string, unknown>;
   created_at: string;
 };
-
-export type Filters = {
-  source?: string;
-  project?: string;
-};
-
+export type Filters = { source?: string; project?: string };
 export type Cursor = { created_at: string; id: string } | null;
-
+export type MatchRow = Thought & { similarity: number };
 const PAGE_SIZE = 50;
 
-let _client: SupabaseClient | null = null;
-function client(): SupabaseClient {
-  if (_client) return _client;
-  const url = process.env.SUPABASE_URL;
-  const key = process.env.SUPABASE_SERVICE_ROLE_KEY;
-  if (!url || !key) {
-    throw new Error("SUPABASE_URL or SUPABASE_SERVICE_ROLE_KEY missing");
-  }
-  _client = createClient(url, key, {
-    auth: { persistSession: false, autoRefreshToken: false },
-  });
-  return _client;
+// The dashboard uses a dedicated SELECT-only role; this URL never reaches clients.
+export async function queryRows<T>(query: string, params: unknown[] = []): Promise<T[]> {
+  const url = process.env.DATABASE_URL;
+  if (!url) throw new Error("DATABASE_URL missing");
+  return await neon(url).query(query, params) as T[];
 }
 
 export function encodeCursor(c: { created_at: string; id: string }): string {
   return Buffer.from(`${c.created_at}|${c.id}`).toString("base64url");
 }
-
 export function decodeCursor(s: string | undefined): Cursor {
   if (!s) return null;
   try {
-    const decoded = Buffer.from(s, "base64url").toString();
-    const [created_at, id] = decoded.split("|");
-    if (!created_at || !id) return null;
+    const [created_at, id] = Buffer.from(s, "base64url").toString().split("|");
+    if (!created_at || !Number.isFinite(Date.parse(created_at)) ||
+        !/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(id ?? "")) return null;
     return { created_at, id };
-  } catch {
-    return null;
-  }
+  } catch { return null; }
 }
 
-export async function listThoughts(
-  filters: Filters,
-  cursor: Cursor
-): Promise<{ rows: Thought[]; nextCursor: string | null }> {
-  let q = client()
-    .from("thoughts")
-    .select("id, content, metadata, created_at")
-    .is("deleted_at", null)
-    .order("created_at", { ascending: false })
-    .order("id", { ascending: false })
-    .limit(PAGE_SIZE + 1);
-
-  if (filters.source) {
-    q = q.eq("metadata->>source", filters.source);
-  }
-  if (filters.project && filters.source) {
-    const projectKey = `${filters.source}_project`;
-    q = q.eq(`metadata->>${projectKey}`, filters.project);
-  }
-  if (cursor) {
-    q = q.or(
-      `created_at.lt.${cursor.created_at},and(created_at.eq.${cursor.created_at},id.lt.${cursor.id})`
-    );
-  }
-
-  const { data, error } = await q;
-  if (error) throw new Error(`listThoughts: ${error.message}`);
-  const rows = (data ?? []) as Thought[];
+export async function listThoughts(filters: Filters, cursor: Cursor): Promise<{ rows: Thought[]; nextCursor: string | null }> {
+  const rows = await queryRows<Thought>(`
+    select id, content, metadata, created_at::text as created_at from public.thoughts
+    where deleted_at is null
+      and ($1::text is null or metadata->>'source' = $1)
+      and ($2::text is null or metadata->>$3::text = $2)
+      and ($4::timestamptz is null or (created_at, id) < ($4::timestamptz, $5::uuid))
+    order by created_at desc, id desc limit $6`,
+    [filters.source ?? null, filters.source ? filters.project ?? null : null,
+      filters.source ? `${filters.source}_project` : null,
+      cursor?.created_at ?? null, cursor?.id ?? null, PAGE_SIZE + 1]);
   const hasMore = rows.length > PAGE_SIZE;
   const page = hasMore ? rows.slice(0, PAGE_SIZE) : rows;
   const last = page[page.length - 1];
-  const nextCursor =
-    hasMore && last ? encodeCursor({ created_at: last.created_at, id: last.id }) : null;
-  return { rows: page, nextCursor };
+  return { rows: page, nextCursor: hasMore && last ? encodeCursor(last) : null };
 }
 
-export type FilterFacets = {
-  sources: string[];
-  projectsBySource: Record<string, string[]>;
-};
-
+export type FilterFacets = { sources: string[]; projectsBySource: Record<string, string[]> };
 export async function distinctMetadataValues(): Promise<FilterFacets> {
-  const { data: rows, error } = await client()
-    .from("thoughts")
-    .select("metadata")
-    .is("deleted_at", null)
-    .limit(10000);
-  if (error) throw new Error(`distinctMetadataValues: ${error.message}`);
-
+  const rows = await queryRows<{metadata: Record<string, unknown>}>(
+    "select metadata from public.thoughts where deleted_at is null limit 10000");
   const sources = new Set<string>();
-  const projectsBySource: Record<string, Set<string>> = {};
-  for (const r of rows ?? []) {
-    const md = (r as { metadata: Record<string, unknown> }).metadata ?? {};
+  const projectsBySource = new Map<string, Set<string>>();
+  for (const r of rows) {
+    const md = r.metadata ?? {};
     const source = typeof md.source === "string" ? md.source : null;
     if (!source) continue;
     sources.add(source);
-    const projectKey = `${source}_project`;
-    const project = typeof md[projectKey] === "string" ? (md[projectKey] as string) : null;
-    if (project) {
-      if (!projectsBySource[source]) projectsBySource[source] = new Set();
-      projectsBySource[source].add(project);
+    const project = md[`${source}_project`];
+    if (typeof project === "string" && project) {
+      if (!projectsBySource.has(source)) projectsBySource.set(source, new Set());
+      projectsBySource.get(source)!.add(project);
     }
   }
-  return {
-    sources: Array.from(sources).sort(),
-    projectsBySource: Object.fromEntries(
-      Object.entries(projectsBySource).map(([k, v]) => [k, Array.from(v).sort()])
-    ),
-  };
+  return { sources: Array.from(sources).sort(), projectsBySource: Object.fromEntries(
+    Array.from(projectsBySource, ([k,v]) => [k, Array.from(v).sort()])) };
 }
 
 export async function getThought(id: string): Promise<Thought | null> {
-  const { data, error } = await client()
-    .from("thoughts")
-    .select("id, content, metadata, created_at")
-    .eq("id", id)
-    .is("deleted_at", null)
-    .maybeSingle();
-  if (error) throw new Error(`getThought: ${error.message}`);
-  return (data as Thought | null) ?? null;
+  if (!/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(id)) return null;
+  const rows = await queryRows<Thought>(
+    "select id, content, metadata, created_at::text as created_at from public.thoughts where id = $1::uuid and deleted_at is null", [id]);
+  return rows[0] ?? null;
+}
+
+// Preserve the core RPC's ordering, threshold and over-fetch semantics, then
+// hide deleted rows as the previous dashboard did.
+export async function matchVisibleThoughts(embedding: number[] | string, threshold: number, count: number): Promise<MatchRow[]> {
+  const vector = typeof embedding === "string" ? embedding : JSON.stringify(embedding);
+  return queryRows<MatchRow>(`
+    select matches.id, matches.content, matches.metadata, matches.created_at::text as created_at, matches.similarity
+    from public.match_thoughts($1::vector, $2::float, $3::int, '{}'::jsonb) matches
+    join public.thoughts visible on visible.id = matches.id
+    where visible.deleted_at is null
+    order by matches.similarity desc`, [vector, threshold, count]);
 }
 
 export async function getNeighbors(id: string, k = 5): Promise<Thought[]> {
-  const { data: src, error: srcErr } = await client()
-    .from("thoughts")
-    .select("embedding")
-    .eq("id", id)
-    .is("deleted_at", null)
-    .maybeSingle();
-  if (srcErr) throw new Error(`getNeighbors src: ${srcErr.message}`);
-  const embedding = (src as { embedding: number[] | string | null } | null)?.embedding;
+  const rows = await queryRows<{embedding: string | null}>(
+    "select embedding::text from public.thoughts where id=$1::uuid and deleted_at is null", [id]);
+  const embedding = rows[0]?.embedding;
   if (!embedding) return [];
-
-  // match_thoughts is the core RPC and doesn't filter on deleted_at. Pull
-  // extra candidates and post-filter against a visible-id set so soft-deleted
-  // rows can't appear as neighbors.
-  const { data, error } = await client().rpc("match_thoughts", {
-    query_embedding: embedding as unknown as number[],
-    match_threshold: 0.7,
-    match_count: k * 4 + 1,
-    filter: {},
-  });
-  if (error) throw new Error(`getNeighbors match: ${error.message}`);
-  type MatchRow = Thought & { similarity: number };
-  const rows = (data ?? []) as MatchRow[];
-  const candidateIds = rows.map((r) => r.id).filter((rid) => rid !== id);
-  if (candidateIds.length === 0) return [];
-
-  const { data: visible, error: visErr } = await client()
-    .from("thoughts")
-    .select("id")
-    .in("id", candidateIds)
-    .is("deleted_at", null);
-  if (visErr) throw new Error(`getNeighbors visible: ${visErr.message}`);
-  const visibleSet = new Set((visible ?? []).map((r) => (r as { id: string }).id));
-
-  return rows
-    .filter((r) => r.id !== id && visibleSet.has(r.id))
-    .slice(0, k)
-    .map(({ id, content, metadata, created_at }) => ({ id, content, metadata, created_at }));
+  const matches = await matchVisibleThoughts(embedding, 0.7, k * 4 + 1);
+  return matches.filter(r => r.id !== id).slice(0,k)
+    .map(({id,content,metadata,created_at}) => ({id,content,metadata,created_at}));
 }

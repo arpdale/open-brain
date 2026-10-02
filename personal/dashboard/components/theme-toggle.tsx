@@ -8,9 +8,11 @@ export function ThemeToggle({ initial }: { initial: Theme }) {
 
   // Sync with DOM on mount in case SSR snapshot drifted
   useEffect(() => {
-    const dom = (document.documentElement.dataset.theme as Theme) ?? "light";
-    if (dom !== theme) setTheme(dom);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+    const frame = requestAnimationFrame(() => {
+      const dom = document.documentElement.dataset.theme;
+      setTheme(dom === "dark" ? "dark" : "light");
+    });
+    return () => cancelAnimationFrame(frame);
   }, []);
 
   function toggle() {

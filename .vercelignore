@@ -1,0 +1,11 @@
+.local
+.planning
+.claude
+.git
+.env*
+**/.env*
+**/.dev.vars*
+**/node_modules
+personal/backend
+personal/backend-tests
+personal/migration

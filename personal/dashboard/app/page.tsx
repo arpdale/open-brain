@@ -1,7 +1,7 @@
 import { Suspense } from "react";
 import Link from "next/link";
 import { decodeCursor, distinctMetadataValues, listThoughts } from "@/lib/db";
-import { retrieveTopK } from "@/lib/search";
+import { retrieveTopK, searchThoughts } from "@/lib/search";
 import { readTheme } from "@/lib/theme";
 import { FilterPills } from "@/components/filter-pills";
 import { SearchBar } from "@/components/search-bar";
@@ -110,27 +110,8 @@ async function AskView({ query }: { query: string }) {
 }
 
 async function SearchView({ query }: { query: string }) {
-  const start = Date.now();
-  let sources;
-  try {
-    sources = await retrieveTopK(query, 30);
-  } catch (err) {
-    return (
-      <SearchResults
-        results={[]}
-        query={query}
-        elapsedMs={Date.now() - start}
-        error={(err as Error).message}
-      />
-    );
-  }
-  return (
-    <SearchResults
-      results={sources}
-      query={query}
-      elapsedMs={Date.now() - start}
-    />
-  );
+  const { results, elapsed_ms, error } = await searchThoughts(query, 30);
+  return <SearchResults results={results} query={query} elapsedMs={elapsed_ms} error={error} />;
 }
 
 async function BrowseView({

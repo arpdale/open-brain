@@ -6,10 +6,11 @@
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
-    "lint": "eslint"
+    "lint": "eslint",
+    "test": "node --experimental-strip-types --test tests/*.test.mjs"
   },
   "dependencies": {
-    "@supabase/supabase-js": "^2.105.0",
+    "@neondatabase/serverless": "1.0.2",
     "next": "16.2.4",
     "react": "19.2.4",
     "react-dom": "19.2.4",

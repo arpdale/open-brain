@@ -1,36 +1,26 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# Open Brain personal dashboard
 
-## Getting Started
+Browse, filter, search, ask questions, and edit thoughts. The dashboard runs on
+Vercel using Next.js and a server-only Neon HTTP connection. It uses a dedicated
+`open_brain_dashboard` database role with SELECT access; mutations go through the
+authenticated Worker update endpoint.
 
-First, run the development server:
+Required server environment variables:
 
-```bash
-npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
-```
+- `DATABASE_URL`: pooled Neon URL for the dashboard read-only role.
+- `OPENROUTER_API_KEY`: existing embedding and synthesis provider key.
+- `BRAIN_PASSWORD`, `SESSION_SECRET`: existing password and signed-session secrets.
+- `UPDATE_THOUGHT_URL`, `UPDATE_THOUGHT_SECRET`: Worker endpoint and shared secret.
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+Keep all credentials server-side. Do not prefix these names with `NEXT_PUBLIC_`.
+The production session lasts 30 days and uses an HttpOnly, Secure, SameSite=Lax
+cookie. Every mutation verifies the session again before contacting the Worker.
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+Run `npm install`, `npm run dev`, `npm run lint`, and `npm run build` here.
+Configure a candidate preview with Neon and Worker endpoints before changing
+production environment settings. The repository root environment symlink is for
+local use only; preserve existing production configuration for rollback.
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
-
-## Learn More
-
-To learn more about Next.js, take a look at the following resources:
-
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
-
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
-
-## Deploy on Vercel
-
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
-
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+Search embeds queries with `openai/text-embedding-3-small` through OpenRouter,
+uses the existing `match_thoughts` database function, and filters soft-deleted
+results after the original over-fetch. Existing stored embeddings are reused.

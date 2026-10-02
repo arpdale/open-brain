@@ -1,4 +1,5 @@
-import { createClient } from "@supabase/supabase-js";
+import "server-only";
+import { matchVisibleThoughts } from "@/lib/db";
 
 const EMBEDDING_PROVIDER_URL = "https://openrouter.ai/api/v1/embeddings";
 const EMBEDDING_MODEL = "openai/text-embedding-3-small";
@@ -42,11 +43,7 @@ export async function retrieveTopK(
   const safeThreshold = Math.min(1, Math.max(0, threshold));
 
   const orKey = process.env.OPENROUTER_API_KEY;
-  const url = process.env.SUPABASE_URL;
-  const key = process.env.SUPABASE_SERVICE_ROLE_KEY;
-  if (!orKey || !url || !key) {
-    throw new Error("Missing env config (OPENROUTER_API_KEY / SUPABASE_URL / SUPABASE_SERVICE_ROLE_KEY)");
-  }
+  if (!orKey) throw new Error("OPENROUTER_API_KEY missing");
 
   // Embed the query
   const embedRes = await fetch(EMBEDDING_PROVIDER_URL, {
@@ -66,35 +63,9 @@ export async function retrieveTopK(
     throw new Error("Embedding response malformed");
   }
 
-  // Match thoughts via Supabase RPC. The core RPC doesn't filter deleted_at,
-  // so over-fetch and post-filter against a visible-id set.
-  const supa = createClient(url, key, {
-    auth: { persistSession: false, autoRefreshToken: false },
-  });
   const overFetch = Math.min(200, safeK * 4);
-  const { data, error } = await supa.rpc("match_thoughts", {
-    query_embedding: embedding as unknown as number[],
-    match_threshold: safeThreshold,
-    match_count: overFetch,
-    filter: {},
-  });
-  if (error) {
-    throw new Error(`match_thoughts: ${error.message}`);
-  }
-  const rows = (data ?? []) as SearchResult[];
-  if (rows.length === 0) return rows;
-
-  const ids = rows.map((r) => r.id);
-  const { data: visible, error: visErr } = await supa
-    .from("thoughts")
-    .select("id")
-    .in("id", ids)
-    .is("deleted_at", null);
-  if (visErr) {
-    throw new Error(`match_thoughts visible: ${visErr.message}`);
-  }
-  const visibleSet = new Set((visible ?? []).map((r) => (r as { id: string }).id));
-  return rows.filter((r) => visibleSet.has(r.id)).slice(0, safeK);
+  const rows = await matchVisibleThoughts(embedding, safeThreshold, overFetch);
+  return rows.slice(0, safeK);
 }
 
 /**
