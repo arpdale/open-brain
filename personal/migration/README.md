@@ -2,7 +2,7 @@
 
 This directory migrates the active personal deployment. Community recipes, the upstream `server/` example, and the original Supabase functions remain historical/reference code. They are not dependencies of the new deployed application.
 
-See [VERIFICATION.md](VERIFICATION.md) for deployed test results and the exact current state. Production cutover remains pending; the candidate is write-fenced.
+See [VERIFICATION.md](VERIFICATION.md) for deployed test results and the exact current state. The user-approved production cutover is complete: Neon is authoritative, Supabase is write-fenced and retained for rollback.
 
 ## Architecture and access
 
@@ -49,15 +49,18 @@ Install `psycopg[binary]==3.2.10` into a private virtual environment. Put a new 
 
 No embeddings are regenerated during database migration. New capture/edit/search tests incur normal provider usage only.
 
-## Clients and cutover checklist
+## Active clients and completed cutover
 
-Do not switch any client until deployed verification passes and final cutover is approved.
+- Worker production version `d57a22a9e91a4bcfa13d8307418ba4b7`: writes and Slack replies enabled; target fence removed.
+- Vercel production deployment `dpl_ByTfCfDMDtqY2LwJVHjAKFYEiQ4J` serves `https://hey-otis.vercel.app`. A direct production build was used because preview promotion was rejected. All Vercel environment targets have zero Supabase keys.
+- Hosted Claude connector **Open Brain (Neon)**, ID `c707740d-d052-4dd3-9e23-c109d0cbe14c`, is connected with four tools, each set to Needs approval. The old connector is disconnected; its rollback configuration is retained privately.
+- Both local Claude Code entries, `open-brain` and `open-brain2`, point to the Worker MCP endpoint. Their latest configuration was updated atomically with all other fields preserved.
+- Slack app **otis-listener** Event Subscription is verified and saved as `https://open-brain-neon.arpdale.workers.dev/ingest-thought` using the signed challenge.
+- Repository-root `.env.local` and the dashboard environment use the new server-only configuration; Supabase variables were removed. Local ChatGPT and Notion importers use the authenticated import API and preserve supplied vectors. The ignored Ask-mode Supabase test is historical.
 
-1. Hosted Claude connector: live source logs show `Claude-User` requests. Its account/UI configuration must be inspected and updated. Retain the existing key, change only the URL. Hosted clients may not be discoverable from local files.
-2. Two local Claude Code entries, `open-brain` and `open-brain2`, in the project section of `~/.claude.json` reference the old MCP URL. Preserve headers and update both URLs.
-3. Vercel project `prj_SPr6U2AcisviaBo4gqV3G3HybOzY`, current domain `hey-otis.vercel.app`: promote the verified deployment and configure server-only DATABASE_URL and new UPDATE_THOUGHT_URL/secret. Remove obsolete Supabase env variables from active configuration only after recording rollback values.
-4. Slack app Event Subscriptions: replace its request URL with the verified `/ingest-thought` endpoint; verify signed challenge. The checked-in manifest previously had only a placeholder, so it is not evidence of the current remote URL.
-5. Local `.planning/imports/chatgpt/capture-thoughts.py` and `.planning/imports/notion/ingest.py`: adapted to IMPORT_THOUGHT_URL plus MCP_ACCESS_KEY. They preserve supplied vectors and metadata. Set these in private local env after cutover; remove old Supabase credentials from active importer config. Old ignored Ask-mode test script remains historical and must not be used as a current runtime test.
+The source `migration_write_fence` blocks writes while retaining reads and all original data/functions. Under that fence, 762 rows matched the exact captured hashes. Docker-based pg_dump stopped during the final snapshot attempt; the existing COPY snapshot was reused only after proving its every-row/vector hashes still matched the fenced source. Final target refresh and integrity checks passed.
+
+The sequence below remains the operational procedure for repeating a controlled cutover; it is no longer pending work.
 
 Safe write cutover sequence:
 
@@ -81,10 +84,8 @@ Workers Free: 100,000 requests/day and 10ms CPU/invocation. Queues Free: 10,000 
 
 Sources: https://neon.com/pricing ; https://neon.com/docs/extensions/pgvector ; https://developers.cloudflare.com/workers/platform/pricing/ ; https://developers.cloudflare.com/queues/platform/pricing/ .
 
-### Hosted Claude connector observed
+### Retained integrations for rollback
 
-Read-only inspection of Claude Desktop's Customize → Connectors → Yours confirmed one connected Web Custom connector named **Open Brain**, ID `0e7aad2d-42de-4ada-8fa0-68517cd7ca6a`, pointing to the old Supabase MCP endpoint with `?key=` authentication. All four tools currently require approval. Its menu offers Refresh tools list and Remove, with no URL-edit control; cutover may require recreating the connector with the same key and restoring the same tool permissions. It was left unchanged during preparation.
+The original hosted Claude connector (`0e7aad2d-42de-4ada-8fa0-68517cd7ca6a`) is disconnected. Its previous Supabase URL/key and tool approvals are retained privately for rollback. The current connected connector is **Open Brain (Neon)** with the same access-key compatibility and explicit tool approval settings.
 
-### Slack subscription observed
-
-Read-only inspection confirmed Slack app **otis-listener** (`A0B1AEKK77A`) in **Blossom** (`T044Y5N4CMN`) has the old `/functions/v1/ingest-thought` URL verified in Event Subscriptions. Delayed Events is unchecked. The app and its subscription were left unchanged. Cutover must save the new URL after signed-challenge validation; do not rotate the existing signing secret or bot token.
+Slack app **otis-listener** (`A0B1AEKK77A`) in **Blossom** (`T044Y5N4CMN`) now uses the verified Worker ingestion URL. The existing signing secret and bot token were preserved. Signed challenge, ingestion and queue behavior were tested, but no outgoing Slack confirmation message was sent during verification.

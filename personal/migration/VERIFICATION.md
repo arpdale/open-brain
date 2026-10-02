@@ -1,23 +1,35 @@
-# Migration preparation results — 2026-10-02
+# Migration results — 2026-10-02
 
-Status: candidate implemented, deployed and verified; production cutover pending.
-Supabase is still authoritative. No source write fence is installed, no existing
-client has been switched, and the source project/functions/data remain available.
+Status: user-approved production cutover completed. Neon is authoritative.
+Supabase is retained with `migration_write_fence` installed; original records
+and functions remain available for rollback. No retirement was performed.
 
-## Deployed candidates
+## Active production
 
 - Worker: `https://open-brain-neon.arpdale.workers.dev`
-- Dashboard preview: `https://open-brain-mrjl809bi-arpdale.vercel.app`
-- Vercel deployment: `dpl_23EThw7ChERVJKHNuS6Hiw27iPPR`
+- Worker version: `d57a22a9e91a4bcfa13d8307418ba4b7`
+- Dashboard: `https://hey-otis.vercel.app`
+- Vercel deployment: `dpl_ByTfCfDMDtqY2LwJVHjAKFYEiQ4J`
 - Neon: `silent-wave-89224791`, branch `br-late-cloud-b4nyht2e`
 - Queues: `open-brain-enrichment` and `open-brain-enrichment-dlq`
 
-After testing, the Worker has `WRITES_ENABLED=false` and
-`SLACK_REPLIES_ENABLED=false`. The target database write fence is installed on
-thoughts and jobs to block invocations retaining older environment flags. There
-are no remaining test records or jobs. Reads remain available with existing auth.
-The preview is protected by both Vercel deployment protection and application
-login. Temporary share URLs and all credentials remain private.
+Target writes and Slack replies are enabled and the target database fence is
+removed. Source writes remain fenced. No temporary test records or jobs remain.
+A direct production dashboard build replaced the candidate because preview
+promotion was rejected. All Vercel targets and active local environments have
+zero Supabase variables; database credentials remain server-side.
+
+The tested branch is pushed to `origin/contrib/arpdale/neon-migration` and Vercel
+production branch tracking is set to that branch. The original `main` remains
+unchanged and no longer controls production. Committed Worker flags match the
+live enabled state; synthetic Slack suites must use a separate candidate with
+replies suppressed. Existing Claude Code sessions may need restarting to reload
+their updated MCP configuration.
+
+The seven importer checks also passed after cutover. Slack bot authentication
+passed, and Slack itself verified the new signed request URL. A short
+post-cutover source log window returned no old Edge/API endpoint events; that
+does not rule out an undiscovered client returning later.
 
 ## Verification evidence
 
@@ -26,12 +38,12 @@ login. Temporary share URLs and all credentials remain private.
 | Full-row/embedding hashes after cleanup | Exact match to 762-row source snapshot |
 | Vector dimensions | 762 of 762 are 1536-dimensional |
 | SQL similarity parity | 15 cases, 129 results, matching IDs/ranks/rounded scores |
-| Actual MCP SDK clients | 14 checks passed: source tool compatibility, all four tools, persistence, edit/search/delete/restore, missing/invalid auth |
+| Actual MCP SDK clients | 14 checks passed before and after cutover: source tool compatibility, all four tools, persistence, edit/search/delete/restore, missing/invalid auth |
 | Deployed signed Slack ingestion + queue | 10 checks passed: signatures/replay, channel/user/bot rejection, duplicate delivery, enrichment, failed-job recovery, cleanup |
 | Migrated Slack duplicates | 6 checks passed: retained vector/metadata unchanged with no enrichment, missing-vector recovery on original ID, repeated duplicate stability |
 | Deployed importer | 7 checks passed: auth, dimensions, insert/lookup/vector match/update, exact supplied-vector preservation, cleanup |
 | Actual local importer transports | Both ChatGPT and Notion Python adapters performed authenticated lookups successfully |
-| Browser against deployed dashboard | 11 checks passed: login failures/success, secure cookie, protected routes, pagination, source/project filters, detail/neighbors, search, Ask, edit + reload, delete + Undo, logout/malformed cookie |
+| Browser against deployed dashboard | 11 checks passed before and after cutover: login failures/success, secure cookie, protected routes, pagination, source/project filters, detail/neighbors, search, Ask, edit + reload, delete + Undo, logout/malformed cookie |
 | Database fence rehearsal | Runtime writes rejected on both tables, owner refresh permitted; zero-row statements used |
 | Local backend | Typecheck and 17 tests passed; production dependency audit found 0 vulnerabilities |
 | Local dashboard | Build/typecheck/lint and 2 auth tests passed |
@@ -50,29 +62,34 @@ zero missing vectors, zero Auth users and zero Storage objects, and the same
 four original deployed functions. `runtime-waituntil-check` remains a 410
 tombstone. No source data or original function was removed or changed.
 
-## Remaining cutover work
+## Final sync and client configuration
 
-Follow the fenced final-sync sequence in README.md, then switch the hosted Claude
-connector, both local Claude Code entries, Slack Event Subscriptions, Vercel
-production and local importer environments. Production still depends on Supabase
-until those steps are performed. The new Worker source and deployed preview have
-no Supabase runtime dependency; obsolete Supabase variables were removed from
-Preview targets only. Historical/reference code and rollback source remain.
+With the source fenced, all 762 records matched the captured every-column and
+vector hashes. The final Docker pg_dump attempt stopped; the existing COPY
+snapshot was reused only after this exact-hash proof against the fenced source.
+The final target refresh and full integrity verification passed. No embeddings
+were regenerated for migration.
 
-Hosted Claude's connector UI has no URL-edit control; it may need recreation
-with the same key and tool approvals. Other clients not visible in accessible
-local settings/account UI cannot be conclusively ruled out; monitor old endpoint
-logs during cutover. Do not print query-string keys when inspecting logs.
+Hosted Claude **Open Brain (Neon)** is connected under connector ID
+`c707740d-d052-4dd3-9e23-c109d0cbe14c`, with all four tools set to Needs approval.
+The old connector is disconnected and retained for rollback. Both local Claude
+Code URLs were updated atomically against the latest settings, preserving all
+other fields. Slack's signed challenge was verified and its Worker ingestion URL
+saved. Root/dashboard local environments now configure Neon, Worker updates and
+the authenticated importer API. Supabase secrets were removed from active
+Vercel configuration across all environment targets.
 
-Private candidate files are prepared for both local Claude URL replacements,
-hosted Claude's authenticated endpoint, importer variables, and dashboard Neon
-variables. `prepare-clients.py` preserves all unrelated Claude settings and can
-regenerate its candidate from the latest live file before applying. Local importer
-code is adapted, but its new environment variables are not active until cutover.
+Post-cutover verification reran the actual MCP client suite (14 checks) and
+production dashboard browser suite (11 checks); both passed and exact temporary
+fixture cleanup completed. Historical/reference Supabase code remains for
+community examples and rollback. Unknown clients outside accessible settings
+cannot be ruled out; monitor old endpoint callers without printing URL keys.
+
+## Remaining limitations
 
 Synthetic tests deliberately sent no Slack messages. Signed challenge, durable
 enrichment and recovery were tested; live threaded confirmation delivery remains
-to be checked after cutover using an explicitly authorized temporary message.
+unverified until an explicitly authorized temporary message is sent. Slack replies are now enabled in production.
 Slack confirmation is at least once around a crash between send and checkpoint;
 database content and queue claims are idempotent. Queue delivery exhaustion or
 24-hour expiry leaves durable database jobs for authenticated manual recovery.

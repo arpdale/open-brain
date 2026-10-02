@@ -17,8 +17,8 @@
     }
   },
   "vars": {
-    "SLACK_REPLIES_ENABLED": "false",
-    "WRITES_ENABLED": "false",
+    "SLACK_REPLIES_ENABLED": "true",
+    "WRITES_ENABLED": "true",
     "ALLOWED_ORIGINS": "https://claude.ai,https://hey-otis.vercel.app"
   },
   "queues": {
