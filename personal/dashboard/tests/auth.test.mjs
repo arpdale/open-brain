@@ -1,28 +1,34 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { createHmac, randomBytes } from "node:crypto";
-import { checkPassword, issueSessionCookie, isSessionValid } from "../lib/auth.ts";
+import { isOwnerEmail, isOwnerSession, safeReturnPath } from "../lib/auth-policy.ts";
 
-process.env.SESSION_SECRET = randomBytes(32).toString("hex");
-process.env.BRAIN_PASSWORD = randomBytes(16).toString("hex");
+const owner = "owner@example.com";
+const valid = { user: { email: owner, emailVerified: true }, session: { expiresAt: new Date(Date.now() + 60_000).toISOString() } };
 
-test("sessions accept a signed token and reject missing, tampered, malformed and expired tokens", async () => {
-  const cookie = await issueSessionCookie();
-  assert.equal(await isSessionValid(cookie.value), true);
-  assert.equal(cookie.options.httpOnly, true);
-  assert.equal(cookie.options.sameSite, "lax");
-  assert.equal(await isSessionValid(undefined), false);
-  const [body, signature] = cookie.value.split(".");
-  const first = signature[0] === "A" ? "B" : "A";
-  assert.equal(await isSessionValid(`${body}.${first}${signature.slice(1)}`), false);
-  assert.equal(await isSessionValid("invalid.%%%"), false);
-  const expired = Buffer.from(JSON.stringify({ exp: 1, nonce: "test" })).toString("base64url");
-  const mac = createHmac("sha256", process.env.SESSION_SECRET).update(expired).digest("base64url");
-  assert.equal(await isSessionValid(`${expired}.${mac}`), false);
+test("only a verified owner with a live session has access", () => {
+  assert.equal(isOwnerSession(valid, owner), true);
+  for (const value of [null, {}, { user: valid.user },
+    { ...valid, user: { email: "other@example.com", emailVerified: true } },
+    { ...valid, user: { email: owner, emailVerified: false } },
+    { ...valid, user: { email: owner } },
+    { ...valid, session: { expiresAt: "2000-01-01" } },
+    { ...valid, session: { expiresAt: "invalid" } }]) {
+    assert.equal(isOwnerSession(value, owner), false);
+  }
+  assert.equal(isOwnerSession(valid, undefined), false);
+  assert.equal(isOwnerSession(valid, ""), false);
 });
 
-test("password authentication accepts only the configured password", () => {
-  assert.equal(checkPassword(process.env.BRAIN_PASSWORD), true);
-  assert.equal(checkPassword("wrong"), false);
-  assert.equal(checkPassword(""), false);
+test("email matching normalizes case but rejects aliases and suffixes", () => {
+  assert.equal(isOwnerEmail(" Owner@Example.COM ", owner), true);
+  for (const email of ["", "owner+other@example.com", "owner@example.com.evil", "other@example.com"]) {
+    assert.equal(isOwnerEmail(email, owner), false);
+  }
+});
+
+test("return paths remain on the dashboard and cannot loop through login", () => {
+  assert.equal(safeReturnPath("/t/123?q=test"), "/t/123?q=test");
+  for (const value of ["https://evil.example", "//evil.example", "/\\evil.example", "/\nevil.example", "/login", "javascript:alert(1)"]) {
+    assert.equal(safeReturnPath(value), "/");
+  }
 });

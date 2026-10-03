@@ -1,4 +1,5 @@
 import "server-only";
+import { requireOwner } from "@/lib/auth";
 import { neon } from "@neondatabase/serverless";
 
 export type Thought = {
@@ -14,6 +15,7 @@ const PAGE_SIZE = 50;
 
 // The dashboard uses a dedicated SELECT-only role; this URL never reaches clients.
 export async function queryRows<T>(query: string, params: unknown[] = []): Promise<T[]> {
+  await requireOwner();
   const url = process.env.DATABASE_URL;
   if (!url) throw new Error("DATABASE_URL missing");
   return await neon(url).query(query, params) as T[];

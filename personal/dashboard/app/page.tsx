@@ -1,3 +1,5 @@
+import { signOut } from "@/app/login/actions";
+import { requireOwner } from "@/lib/auth";
 import { Suspense } from "react";
 import Link from "next/link";
 import { decodeCursor, distinctMetadataValues, listThoughts } from "@/lib/db";
@@ -11,6 +13,8 @@ import { SynthesisFallback } from "@/components/synthesis-fallback";
 import { ThemeToggle } from "@/components/theme-toggle";
 import { ThoughtCard } from "@/components/thought-card";
 import { UndeleteToast } from "@/components/undelete-toast";
+
+export const dynamic = "force-dynamic";
 
 type Mode = "ask" | "search";
 
@@ -28,6 +32,7 @@ export default async function BrowsePage({
 }: {
   searchParams: SearchParams;
 }) {
+  await requireOwner();
   const sp = await searchParams;
   const query = sp.q?.trim() ?? "";
   const rawMode = sp.mode;
@@ -48,7 +53,7 @@ export default async function BrowsePage({
           </Link>
           <div className="flex items-center gap-2">
             <ThemeToggle initial={theme} />
-            <form action="/api/auth/logout" method="post">
+            <form action={signOut}>
               <button
                 type="submit"
                 className="text-xs text-zinc-500 hover:text-zinc-900 dark:hover:text-zinc-100"

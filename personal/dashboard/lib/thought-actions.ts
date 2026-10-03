@@ -2,14 +2,12 @@
 
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
-import { cookies } from "next/headers";
-import { isSessionValid, SESSION_COOKIE_NAME } from "@/lib/auth";
+import { hasOwnerSession } from "@/lib/auth";
 
 type Result = { ok: true } | { ok: false; error: string };
 
 async function callUpdateThought(payload: Record<string, unknown>): Promise<Result> {
-  const session = (await cookies()).get(SESSION_COOKIE_NAME)?.value;
-  if (!await isSessionValid(session)) return { ok: false, error: "Unauthorized" };
+  if (!await hasOwnerSession()) return { ok: false, error: "Unauthorized" };
   if (typeof payload.id !== "string" || !/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(payload.id)) {
     return { ok: false, error: "Invalid thought ID" };
   }

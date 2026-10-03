@@ -1,3 +1,4 @@
+import { requireOwner } from "@/lib/auth";
 import { notFound } from "next/navigation";
 import { getNeighbors, getThought } from "@/lib/db";
 import { readTheme } from "@/lib/theme";
@@ -7,9 +8,12 @@ import { DeleteButton } from "@/components/delete-button";
 import { EditableContent } from "@/components/editable-content";
 import { ThemeToggle } from "@/components/theme-toggle";
 
+export const dynamic = "force-dynamic";
+
 type Params = Promise<{ id: string }>;
 
 export default async function ThoughtDetailPage({ params }: { params: Params }) {
+  await requireOwner();
   const { id } = await params;
   const theme = await readTheme();
 

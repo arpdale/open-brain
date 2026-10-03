@@ -1,5 +1,10 @@
 # Personal Open Brain: Neon migration
 
+Dashboard authentication was subsequently moved to managed Neon Auth on 2026-10-03.
+See [dashboard authentication](../dashboard/README.md) for current email-code login
+and owner-only access. References below to the shared password/session describe
+the original database cutover.
+
 This directory migrates the active personal deployment. Community recipes, the upstream `server/` example, and the original Supabase functions remain historical/reference code. They are not dependencies of the new deployed application.
 
 See [VERIFICATION.md](VERIFICATION.md) for deployed test results and the exact current state. The user-approved production cutover is complete: Neon is authoritative, Supabase is write-fenced and retained for rollback.

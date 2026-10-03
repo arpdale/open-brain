@@ -1,4 +1,5 @@
 import "server-only";
+import { requireOwner } from "@/lib/auth";
 import { matchVisibleThoughts } from "@/lib/db";
 
 const EMBEDDING_PROVIDER_URL = "https://openrouter.ai/api/v1/embeddings";
@@ -36,6 +37,7 @@ export async function retrieveTopK(
   k: number,
   threshold = DEFAULT_THRESHOLD
 ): Promise<SearchResult[]> {
+  await requireOwner();
   const trimmed = query.trim();
   if (!trimmed) return [];
   if (trimmed.length > 2000) return [];
